@@ -15,6 +15,7 @@ def write_file(path, content):
 def create_icon(text, size, bg, fg):
     img = Image.new("RGB", (size, size), bg)
     draw = ImageDraw.Draw(img)
+    # Use default font (Pillow built-in)
     draw.text((size // 2, size // 2), text, fill=fg, anchor="mm")
     return img
 
@@ -174,15 +175,122 @@ public class MainActivity extends Activity {
     ic_launcher.save(os.path.join(res, "mipmap-xxxhdpi", "ic_launcher.png"))
     banner.save(os.path.join(res, "drawable", "banner.png"))
 
-    # === Gradle Wrapper ===
+    # === Gradle Wrapper: properties + scripts ===
     gradle_wrapper_dir = os.path.join(root, "gradle", "wrapper")
     os.makedirs(gradle_wrapper_dir, exist_ok=True)
+
+    # gradle-wrapper.properties
     write_file(os.path.join(gradle_wrapper_dir, "gradle-wrapper.properties"), """\
 distributionBase=GRADLE_USER_HOME
 distributionPath=wrapper/dists
 distributionUrl=https\\://services.gradle.org/distributions/gradle-8.6-bin.zip
 zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
+""")
+
+    # gradlew (Linux/macOS)
+    write_file(os.path.join(root, "gradlew"), """\
+#!/bin/bash
+# ... (standard Gradle wrapper script)
+##############################################################################
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       https://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+##############################################################################
+
+PRG="$0"
+while [ -h "$PRG" ] ; do
+  ls=`ls -ld "$PRG"`
+  link=`expr "$ls" : '.*-> \\(.*\\)$'`
+  if expr "$link" : '/.*' > /dev/null; then
+    PRG="$link"
+  else
+    PRG=`dirname "$PRG"`"/$link"
+  fi
+done
+SAVED="`pwd`"
+cd "`dirname \"$PRG\"`" >/dev/null
+APP_HOME="`pwd -P`"
+cd "$SAVED" >/dev/null
+
+APP_NAME="Gradle"
+APP_BASE_NAME=`basename "$0"`
+
+DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+
+warn () { echo "$*"; }
+die () { echo; echo "$*"; echo; exit 1; }
+
+cygwin=false; msys=false; darwin=false; nonstop=false
+case "`uname`" in
+  CYGWIN* ) cygwin=true ;;
+  Darwin* ) darwin=true ;;
+  MINGW* ) msys=true ;;
+  NONSTOP* ) nonstop=true ;;
+esac
+
+CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+
+if [ -n "$JAVA_HOME" ] ; then
+  JAVACMD="$JAVA_HOME/bin/java"
+  [ ! -x "$JAVACMD" ] && die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
+else
+  JAVACMD="java"
+  which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command found."
+fi
+
+exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS \\
+  -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+""")
+    os.chmod(os.path.join(root, "gradlew"), 0o755)  # ✅ 关键：设为可执行！
+
+    # gradlew.bat (Windows)
+    write_file(os.path.join(root, "gradlew.bat"), """\
+@rem
+@rem Copyright 2015 the original author or authors.
+@rem
+@rem Licensed under the Apache License, Version 2.0 (the "License");
+@rem you may not use this file except in compliance with the License.
+@rem You may obtain a copy of the License at
+@rem
+@rem      https://www.apache.org/licenses/LICENSE-2.0
+@rem
+
+@if "%DEBUG%" == "" @echo off
+set DIRNAME=%~dp0
+if "%DIRNAME%" == "" set DIRNAME=.
+set APP_HOME=%DIRNAME%
+for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
+set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
+if defined JAVA_HOME goto findJavaFromJavaHome
+set JAVA_EXE=java.exe
+%JAVA_EXE% -version >NUL 2>&1
+if "%ERRORLEVEL%" == "0" goto execute
+echo ERROR: JAVA_HOME is not set and no 'java' command could be found.
+goto fail
+:findJavaFromJavaHome
+set JAVA_HOME=%JAVA_HOME:"=%
+set JAVA_EXE=%JAVA_HOME%/bin/java.exe
+if exist "%JAVA_EXE%" goto execute
+echo ERROR: JAVA_HOME is set to an invalid directory: %JAVA_HOME%
+goto fail
+:execute
+set CLASSPATH=%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar
+"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
+:end
+@exit /b 0
+:fail
+@exit /b 1
 """)
 
     # === 自动生成 keystore（仅当不存在时）===
@@ -205,7 +313,6 @@ zipStorePath=wrapper/dists
             print("✅ keystore 生成成功！")
         except FileNotFoundError:
             print("❌ 错误: 未找到 'keytool'，请确保已安装 JDK 并将其加入 PATH。", file=sys.stderr)
-            print("💡 提示: 在 Ubuntu/Debian 上可运行: sudo apt install openjdk-17-jdk", file=sys.stderr)
             sys.exit(1)
         except subprocess.CalledProcessError as e:
             print(f"❌ keystore 生成失败: {e}", file=sys.stderr)
