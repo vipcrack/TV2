@@ -1,42 +1,79 @@
 name: Build FFZYTV APK
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # 允许手动运行
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: 🛎️ Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 🐍 Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Python deps
-        run: pip install Pillow
+      - name: 📦 Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install Pillow
 
-      - name: Set up JDK 17
+      - name: ☕ Set up JDK 17 (Temurin)
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Verify keytool
+      - name: 🔍 Verify keytool is available
         run: |
+          echo "Checking keytool..."
           which keytool
-          keytool -help >/dev/null
+          keytool -help > /dev/null && echo "✅ keytool found"
 
-      - name: Generate project
+      - name: 🏗️ Generate Android TV project
         run: python build_ffzytv.py
 
-      - name: Debug: List generated files
+      - name: 🔎 Debug: List generated project structure
         run: |
-          echo "=== Root ==="
+          echo "=== Project root ==="
           ls -la FFZYTV/
+          echo ""
           echo "=== gradle/wrapper ==="
           ls -la FFZYTV/gradle/wrapper/
-          echo "=== app/ ==="
+          echo ""
+          echo "=== app directory ==="
           ls -la FFZYTV/app/
+          echo ""
+          echo "=== Check gradlew ==="
+          if [ -f FFZYTV/gradlew ]; then
+            echo "✅ gradlew exists"
+            file FFZYTV/gradlew
+          else
+            echo "❌ ERROR: gradlew NOT FOUND!"
+            exit 1
+          fi
+
+      - name: 🔐 Ensure gradlew is executable (safety fallback)
+        run: chmod +x FFZYTV/gradlew
+
+      - name: 🧱 Build Release APK
+        run: |
+          cd FFZYTV
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: 📂 Debug: Show APK output directory
+        run: |
+          ls -la FFZYTV/app/build/outputs/apk/release/
+
+      - name: 📤 Upload Release APK as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FFZYTV-release-apk
+          path: FFZYTV/app/build/outputs/apk/release/app-release.apk
