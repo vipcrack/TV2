@@ -1,4 +1,0 @@
-<resources>
-    <style name="Theme.App" parent="android:Theme.Material.NoActionBar" />
-    <style name="Theme.Leanback" parent="Theme.Leanback" />
-</resources>
