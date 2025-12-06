@@ -5,7 +5,6 @@ from PIL import Image, ImageDraw
 PROJECT_NAME = "FFZYTV"
 PACKAGE_NAME = "com.ffzy.tv"
 
-# 精简但有效的 gradlew 内容（兼容 Linux/macOS）
 GRADLEW_CONTENT = '''#!/bin/bash
 APP_HOME="$(cd "$(dirname "$0")" && pwd)"
 CLASSPATH="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
@@ -16,9 +15,9 @@ fi
 exec java -cp "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
 '''
 
-def write_file(path, content, mode='w'):
+def write_file(path, content):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, mode, encoding='utf-8' if 'b' not in mode else None) as f:
+    with open(path, 'w', encoding='utf-8') as f:
         f.write(content)
 
 def main():
@@ -27,15 +26,23 @@ def main():
     java_root = os.path.join(src, "java", *PACKAGE_NAME.split("."))
     res = os.path.join(src, "res")
 
-    # === Project files ===
+    # === 创建所有必要目录 ===
+    os.makedirs(java_root, exist_ok=True)
+    # 👇 关键修复：提前创建 res 子目录
+    for d in ["values", "layout", "drawable", "mipmap-xxxhdpi"]:
+        os.makedirs(os.path.join(res, d), exist_ok=True)
+
+    # settings.gradle
     write_file(os.path.join(root, "settings.gradle"), f"rootProject.name = '{PROJECT_NAME}'\ninclude ':app'\n")
 
+    # Project build.gradle
     write_file(os.path.join(root, "build.gradle"), """\
 plugins {
     id 'com.android.application' version '8.3.0' apply false
 }
 """)
 
+    # App build.gradle
     write_file(os.path.join(root, "app", "build.gradle"), f"""\
 plugins {{
     id 'com.android.application'
@@ -76,7 +83,7 @@ dependencies {{
 }}
 """)
 
-    # Manifest
+    # AndroidManifest.xml
     write_file(os.path.join(src, "AndroidManifest.xml"), f"""\
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -99,9 +106,10 @@ dependencies {{
 </manifest>
 """)
 
-    # Resources
+    # strings.xml
     write_file(os.path.join(res, "values", "strings.xml"), '<resources>\n<string name="app_name">FFZYTV</string>\n</resources>')
-    
+
+    # MainActivity.java
     write_file(os.path.join(java_root, "MainActivity.java"), """\
 package com.ffzy.tv;
 import android.app.Activity;
@@ -113,7 +121,8 @@ public class MainActivity extends Activity {
     }
 }
 """)
-    
+
+    # activity_main.xml
     write_file(os.path.join(res, "layout", "activity_main.xml"), """\
 <?xml version="1.0" encoding="utf-8"?>
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
@@ -129,19 +138,23 @@ public class MainActivity extends Activity {
     def create_icon(text, size, bg, fg):
         img = Image.new("RGB", (size, size), bg)
         draw = ImageDraw.Draw(img)
-        draw.text((size//2, size//2), text, fill=fg, anchor="mm")
+        # Use default font
+        draw.text((size // 2, size // 2), text, fill=fg, anchor="mm")
         return img
 
     ic_launcher = create_icon("FF", 144, (70, 130, 180), (255, 255, 255))
     banner = create_icon("FFZYTV", 320, (41, 128, 185), (255, 255, 255))
+
+    # 👇 现在目录已存在，可安全保存
     ic_launcher.save(os.path.join(res, "mipmap-xxxhdpi", "ic_launcher.png"))
     banner.save(os.path.join(res, "drawable", "banner.png"))
 
-    # === Critical: gradlew and wrapper config ===
+    # gradlew
     write_file(os.path.join(root, "gradlew"), GRADLEW_CONTENT)
-    os.chmod(os.path.join(root, "gradlew"), 0o755)  # 👈 关键：本地设置可执行权限
+    os.chmod(os.path.join(root, "gradlew"), 0o755)
 
-    write_file(os.path.join(root, "gradle", "wrapper", "gradle-wrapper.properties"), 
+    # gradle-wrapper.properties
+    write_file(os.path.join(root, "gradle", "wrapper", "gradle-wrapper.properties"),
 """distributionBase=GRADLE_USER_HOME
 distributionPath=wrapper/dists
 distributionUrl=https\\://services.gradle.org/distributions/gradle-8.3-bin.zip
@@ -149,8 +162,7 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 """)
 
-    print(f"✅ Project generated at ./{PROJECT_NAME}")
-    print(f"✅ gradlew exists: {os.path.exists(os.path.join(root, 'gradlew'))}")
+    print(f"✅ Project generated successfully at ./{PROJECT_NAME}")
 
 if __name__ == "__main__":
     main()
