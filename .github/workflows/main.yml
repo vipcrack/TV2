@@ -1,6 +1,10 @@
 name: Build FFZYTV APK
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
@@ -10,12 +14,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Pillow
+      - name: Install Pillow (for icon generation)
         run: pip install Pillow
 
       - name: Set up JDK 17
@@ -27,21 +31,25 @@ jobs:
       - name: Create project directory
         run: mkdir -p FFZYTV
 
-      - name: Generate Gradle Wrapper (official way)
+      - name: Initialize minimal Gradle build and set wrapper to 8.3
         working-directory: FFZYTV
         run: |
-          gradle wrapper --gradle-version 8.3
+          # Create a basic Gradle project
+          gradle init --type basic --dsl groovy --no-split-project
+          # Upgrade Gradle Wrapper to version 8.3
+          ./gradlew wrapper --gradle-version 8.3
           chmod +x gradlew
 
-      - name: Generate Android project source
+      - name: Generate Android TV project source files
         run: python build_ffzytv.py
 
-      # Optional: Restore keystore if needed (example using secret)
-      - name: Restore keystore (optional)
+      # Optional: Restore keystore from secret for signing
+      - name: Restore keystore (if provided)
+        if: env.KEYSTORE_B64 != ''
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
-          if [ -n "${{ secrets.KEYSTORE_B64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > FFZYTV/app/ffzytv.keystore
-          fi
+          echo "$KEYSTORE_B64" | base64 -d > FFZYTV/app/ffzytv.keystore
 
       - name: Build Release APK
         working-directory: FFZYTV
@@ -49,10 +57,10 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: FFZYTV/app/build/outputs/apk/release/app-release.apk
+          name: FFZYTV-release-apk
+          path: FFZYTV/app/build/outputs/apk/release/app-release-*.apk
