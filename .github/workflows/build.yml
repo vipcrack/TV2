@@ -1,39 +1,27 @@
-name: Build FFZYTV APK
-
-on: [push, pull_request]
-
 jobs:
   build:
-    runs-on: windows-latest  # 或 ubuntu-latest
+    runs-on: ubuntu-latest  # 确保是 Linux
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
+      - name: Verify assets/gradle-wrapper.jar
+        run: test -f assets/gradle-wrapper.jar || { echo "Missing JAR!"; exit 1; }
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install Pillow (optional for icons)
-        run: pip install Pillow
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-      - name: Generate Android Project
+      - name: Generate Android project
+        env:
+          PYTHONIOENCODING: utf-8  # 关键！
         run: python build_ffzytv.py
 
-      - name: Build Debug APK
-        run: |
-          cd FFZYTV
-          ./gradlew.bat assembleDebug  # Windows
-          # ./gradlew assembleDebug    # Linux/macOS
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: ffzytv-debug-apk
-          path: FFZYTV/app/build/outputs/apk/debug/app-debug.apk
+      - name: Build debug APK
+        working-directory: ./FFZYTV
+        run: ./gradlew assembleDebug --no-daemon
