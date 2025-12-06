@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import os
+import subprocess
+import sys
 from PIL import Image, ImageDraw
 
 PROJECT_NAME = "FFZYTV"
@@ -22,6 +24,7 @@ def main():
     src = os.path.join(app_dir, "src", "main")
     java_root = os.path.join(src, "java", *PACKAGE_NAME.split("."))
     res = os.path.join(src, "res")
+    keystore_path = os.path.join(app_dir, "ffzytv.keystore")
 
     # Create directories
     os.makedirs(java_root, exist_ok=True)
@@ -82,9 +85,9 @@ android {{
     signingConfigs {{
         release {{
             storeFile file("ffzytv.keystore")
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "mypassword"
-            keyAlias System.getenv("KEY_ALIAS") ?: "ffzytv"
-            keyPassword System.getenv("KEY_PASSWORD") ?: "mypassword"
+            storePassword "mypassword"
+            keyAlias "ffzytv"
+            keyPassword "mypassword"
         }}
     }}
 
@@ -104,8 +107,6 @@ android {{
 
 dependencies {{
     implementation 'androidx.core:core-ktx:1.12.0'
-    // Optional: Uncomment below only if you use Leanback UI (e.g., BrowseSupportFragment)
-    // implementation 'androidx.leanback:leanback:1.1.0-rc01'
 }}
 """)
 
@@ -155,7 +156,7 @@ public class MainActivity extends Activity {
 }
 """)
 
-    # === activity_main.xml (FIXED: match_match → match_parent) ===
+    # === activity_main.xml ===
     write_file(os.path.join(res, "layout", "activity_main.xml"), """\
 <?xml version="1.0" encoding="utf-8"?>
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
@@ -170,7 +171,6 @@ public class MainActivity extends Activity {
     # === Generate icons ===
     ic_launcher = create_icon("FF", 192, (70, 130, 180), (255, 255, 255))
     banner = create_icon("FFZYTV", 320, (41, 128, 185), (255, 255, 255))
-
     ic_launcher.save(os.path.join(res, "mipmap-xxxhdpi", "ic_launcher.png"))
     banner.save(os.path.join(res, "drawable", "banner.png"))
 
@@ -185,11 +185,38 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 """)
 
-    print(f"✅ Android TV project '{PROJECT_NAME}' generated successfully!")
-    print("✅ Fixed: 'match_match' → 'match_parent'")
-    print("✅ Removed invalid leanback-preference dependency")
-    print("✅ Ready for './gradlew assembleRelease'")
-    print("\n💡 Tip: To add Leanback UI later, uncomment the leanback line in app/build.gradle")
+    # === 自动生成 keystore（仅当不存在时）===
+    if not os.path.exists(keystore_path):
+        print("🔑 正在生成测试用 keystore: ffzytv.keystore ...")
+        try:
+            subprocess.run([
+                "keytool", "-genkeypair",
+                "-v",
+                "-storetype", "PKCS12",
+                "-keystore", keystore_path,
+                "-alias", "ffzytv",
+                "-keyalg", "RSA",
+                "-keysize", "2048",
+                "-validity", "10000",
+                "-dname", "CN=FFZYTV, OU=TV, O=FFZY, C=CN",
+                "-storepass", "mypassword",
+                "-keypass", "mypassword"
+            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print("✅ keystore 生成成功！")
+        except FileNotFoundError:
+            print("❌ 错误: 未找到 'keytool'，请确保已安装 JDK 并将其加入 PATH。", file=sys.stderr)
+            print("💡 提示: 在 Ubuntu/Debian 上可运行: sudo apt install openjdk-17-jdk", file=sys.stderr)
+            sys.exit(1)
+        except subprocess.CalledProcessError as e:
+            print(f"❌ keystore 生成失败: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        print("ℹ️  keystore 已存在，跳过生成。")
+
+    print(f"\n✅ Android TV 项目 '{PROJECT_NAME}' 生成完毕！")
+    print("✅ 可直接运行以下命令构建 Release APK：")
+    print(f"   cd {PROJECT_NAME} && ./gradlew assembleRelease --no-daemon")
+    print("\n📦 输出路径: app/build/outputs/apk/release/app-release.apk")
 
 if __name__ == "__main__":
     main()
