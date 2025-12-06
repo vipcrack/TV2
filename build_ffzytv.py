@@ -1,58 +1,11 @@
 #!/usr/bin/env python3
-"""
-Automatically generates a self-contained build_ffzytv.py script
-with embedded gradle-wrapper.jar from official Gradle 8.6 distribution.
-No internet required after generation!
-"""
-
-import os
-import sys
-import urllib.request
-import zipfile
-import io
-import base64
-import tempfile
-
-# URL to official Gradle 8.6 binary distribution
-GRADLE_URL = "https://services.gradle.org/distributions/gradle-8.6-bin.zip"
-WRAPPER_JAR_PATH = "gradle-8.6/gradle/wrapper/gradle-wrapper.jar"
-
-def download_and_extract_jar():
-    print("📥 Downloading gradle-8.6-bin.zip (only partial fetch for efficiency)...")
-    try:
-        with urllib.request.urlopen(GRADLE_URL) as response:
-            # Read entire ZIP into memory (≈120MB, acceptable for CI)
-            zip_data = response.read()
-    except Exception as e:
-        print(f"❌ Failed to download Gradle: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    print("📦 Extracting gradle-wrapper.jar from ZIP...")
-    try:
-        with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
-            jar_data = zf.read(WRAPPER_JAR_PATH)
-        print(f"✅ Extracted {len(jar_data)} bytes.")
-        return jar_data
-    except KeyError:
-        print(f"❌ Path not found in ZIP: {WRAPPER_JAR_PATH}", file=sys.stderr)
-        sys.exit(1)
-
-def encode_to_base64(data):
-    b64 = base64.b64encode(data).decode('ascii')
-    print("🔑 Encoding to base64...")
-    return b64
-
-def generate_build_script(jar_b64):
-    script_content = f'''#!/usr/bin/env python3
 import os
 import subprocess
 import sys
 import base64
 from PIL import Image, ImageDraw
 
-# Embedded gradle-wrapper.jar for Gradle 8.6 (official)
-GRADLE_WRAPPER_JAR_B64 = """{jar_b64}"""
-
+# 配置
 PROJECT_NAME = "FFZYTV"
 PACKAGE_NAME = "com.ffzy.tv"
 
@@ -69,6 +22,7 @@ def write_binary_file(path, data):
 def create_icon(text, size, bg, fg):
     img = Image.new("RGB", (size, size), bg)
     draw = ImageDraw.Draw(img)
+    # 使用默认字体（Pillow 内置）
     draw.text((size // 2, size // 2), text, fill=fg, anchor="mm")
     return img
 
@@ -79,16 +33,15 @@ def main():
     java_root = os.path.join(src, "java", *PACKAGE_NAME.split("."))
     res = os.path.join(src, "res")
     keystore_path = os.path.join(app_dir, "ffzytv.keystore")
-    gradle_wrapper_jar = os.path.join(root, "gradle", "wrapper", "gradle-wrapper.jar")
 
     os.makedirs(java_root, exist_ok=True)
     for d in ["values", "layout", "drawable", "mipmap-xxxhdpi"]:
         os.makedirs(os.path.join(res, d), exist_ok=True)
 
     # gradle.properties
-    write_file(os.path.join(root, "gradle.properties"), "android.useAndroidX=true\\norg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8\\n")
+    write_file(os.path.join(root, "gradle.properties"), "android.useAndroidX=true\norg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8\n")
 
-    # settings.gradle
+    # settings.gradle —— 使用 f-string，但 {} 已转义
     write_file(os.path.join(root, "settings.gradle"), f"""pluginManagement {{
     repositories {{
         gradlePluginPortal()
@@ -103,14 +56,14 @@ dependencyResolutionManagement {{
         mavenCentral()
     }}
 }}
-rootProject.name = '{{PROJECT_NAME}}'
+rootProject.name = '{PROJECT_NAME}'
 include ':app'
 """)
 
     # root build.gradle
-    write_file(os.path.join(root, "build.gradle"), "plugins {{\\n    id 'com.android.application' version '8.3.0' apply false\\n}}\\n")
+    write_file(os.path.join(root, "build.gradle"), "plugins {\n    id 'com.android.application' version '8.3.0' apply false\n}\n")
 
-    # app build.gradle
+    # app build.gradle —— 所有 {} 转义为 {{}}
     write_file(os.path.join(app_dir, "build.gradle"), f"""plugins {{
     id 'com.android.application'
 }}
@@ -173,8 +126,8 @@ dependencies {{
 """)
 
     # strings.xml
-    write_file(os.path.join(res, "values", "strings.xml"), "<resources>\\n    <string name=\\"app_name\\">FFZYTV</string>\\n</resources>\\n")
-    
+    write_file(os.path.join(res, "values", "strings.xml"), "<resources>\n    <string name=\"app_name\">FFZYTV</string>\n</resources>\n")
+
     # activity_main.xml
     write_file(os.path.join(res, "layout", "activity_main.xml"), """<?xml version="1.0" encoding="utf-8"?>
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
@@ -186,43 +139,34 @@ dependencies {{
     android:background="#2C3E50"/>
 """)
 
-    # MainActivity.java
+    # MainActivity.java —— {} 转义为 {{}}
     write_file(os.path.join(java_root, "MainActivity.java"), """package com.ffzy.tv;
 import android.app.Activity;
 import android.os.Bundle;
-public class MainActivity extends Activity {
+public class MainActivity extends Activity {{
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {{
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-    }
-}
+    }}
+}}
 """)
 
-    # Icons
+    # 图标
     ic_launcher = create_icon("FF", 192, (70, 130, 180), (255, 255, 255))
     banner = create_icon("FFZYTV", 320, (41, 128, 185), (255, 255, 255))
     ic_launcher.save(os.path.join(res, "mipmap-xxxhdpi", "ic_launcher.png"))
     banner.save(os.path.join(res, "drawable", "banner.png"))
 
-    # Write gradle-wrapper.jar
-    print("📦 Writing gradle-wrapper.jar...")
-    try:
-        jar_data = base64.b64decode(GRADLE_WRAPPER_JAR_B64.strip())
-        write_binary_file(gradle_wrapper_jar, jar_data)
-    except Exception as e:
-        print(f"❌ Failed to write gradle-wrapper.jar: {{e}}", file=sys.stderr)
-        sys.exit(1)
-
     # gradle-wrapper.properties
     write_file(os.path.join(root, "gradle", "wrapper", "gradle-wrapper.properties"), """distributionBase=GRADLE_USER_HOME
 distributionPath=wrapper/dists
-distributionUrl=https\\\\://services.gradle.org/distributions/gradle-8.6-bin.zip
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.6-bin.zip
 zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 """)
 
-    # gradlew
+    # ⚠️ 关键修复：gradlew 使用普通字符串（非 f-string）✅
     GRADLEW_CONTENT = """#!/bin/bash
 PRG="$0"
 while [ -h "$PRG" ] ; do
@@ -243,8 +187,16 @@ APP_NAME="Gradle"
 APP_BASE_NAME=`basename "$0"`
 DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
 
-warn () { echo "$*"; }
-die () { echo; echo "$*"; echo; exit 1; }
+warn () {
+    ( echo "$*"; )
+}
+
+die () {
+    echo
+    echo "$*"
+    echo
+    exit 1
+}
 
 cygwin=false; msys=false; darwin=false; nonstop=false
 case "`uname`" in
@@ -270,9 +222,9 @@ exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS \\
     write_file(os.path.join(root, "gradlew"), GRADLEW_CONTENT)
     os.chmod(os.path.join(root, "gradlew"), 0o755)
 
-    # Keystore
+    # 生成 keystore
     if not os.path.exists(keystore_path):
-        print("🔑 Generating keystore...")
+        print("🔑 正在生成签名密钥...")
         try:
             subprocess.run([
                 "keytool", "-genkeypair",
@@ -286,29 +238,10 @@ exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS \\
                 "-keypass", "mypassword"
             ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception as e:
-            print(f"⚠️ Keystore failed: {{e}}", file=sys.stderr)
+            print(f"⚠️ 密钥生成失败: {e}", file=sys.stderr)
 
-    print(f"\\n✅ Project '{{PROJECT_NAME}}' ready!")
-    print(f"📁 Run: cd {{PROJECT_NAME}} && ./gradlew --version")
-
-if __name__ == "__main__":
-    main()
-'''
-    return script_content
-
-def main():
-    print("🚀 Starting auto-generation of build_ffzytv.py...")
-    jar_data = download_and_extract_jar()
-    jar_b64 = encode_to_base64(jar_data)
-    script = generate_build_script(jar_b64)
-
-    output_file = "build_ffzytv.py"
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(script)
-    
-    print(f"\n🎉 Success! Generated: {os.path.abspath(output_file)}")
-    print("You can now run:")
-    print(f"  python {output_file}")
+    print(f"\n✅ 项目 '{PROJECT_NAME}' 已成功生成！")
+    print(f"📁 进入目录并构建: cd {PROJECT_NAME} && ./gradlew assembleRelease")
 
 if __name__ == "__main__":
     main()
