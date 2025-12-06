@@ -3,9 +3,10 @@ import os
 import subprocess
 import sys
 import base64
-from PIL import Image, ImageDraw
+import urllib.request
+import zipfile
+import io
 
-# 配置
 PROJECT_NAME = "FFZYTV"
 PACKAGE_NAME = "com.ffzy.tv"
 
@@ -20,11 +21,28 @@ def write_binary_file(path, data):
         f.write(data)
 
 def create_icon(text, size, bg, fg):
-    img = Image.new("RGB", (size, size), bg)
-    draw = ImageDraw.Draw(img)
-    # 使用默认字体（Pillow 内置）
-    draw.text((size // 2, size // 2), text, fill=fg, anchor="mm")
-    return img
+    try:
+        from PIL import Image, ImageDraw
+        img = Image.new("RGB", (size, size), bg)
+        draw = ImageDraw.Draw(img)
+        draw.text((size // 2, size // 2), text, fill=fg, anchor="mm")
+        return img
+    except ImportError:
+        print("⚠️ Pillow not installed. Skipping icon generation.")
+        return None
+
+def download_and_extract_gradle_wrapper():
+    print("📥 下载 gradle-8.6-bin.zip 并提取 gradle-wrapper.jar...")
+    url = "https://services.gradle.org/distributions/gradle-8.6-bin.zip"
+    try:
+        with urllib.request.urlopen(url) as resp:
+            data = resp.read()
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            jar_data = zf.read("gradle-8.6/gradle/wrapper/gradle-wrapper.jar")
+        return jar_data
+    except Exception as e:
+        print(f"❌ 下载失败: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def main():
     root = PROJECT_NAME
@@ -41,7 +59,7 @@ def main():
     # gradle.properties
     write_file(os.path.join(root, "gradle.properties"), "android.useAndroidX=true\norg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8\n")
 
-    # settings.gradle —— 使用 f-string，但 {} 已转义
+    # settings.gradle
     write_file(os.path.join(root, "settings.gradle"), f"""pluginManagement {{
     repositories {{
         gradlePluginPortal()
@@ -63,7 +81,7 @@ include ':app'
     # root build.gradle
     write_file(os.path.join(root, "build.gradle"), "plugins {\n    id 'com.android.application' version '8.3.0' apply false\n}\n")
 
-    # app build.gradle —— 所有 {} 转义为 {{}}
+    # app build.gradle
     write_file(os.path.join(app_dir, "build.gradle"), f"""plugins {{
     id 'com.android.application'
 }}
@@ -139,7 +157,7 @@ dependencies {{
     android:background="#2C3E50"/>
 """)
 
-    # MainActivity.java —— {} 转义为 {{}}
+    # MainActivity.java
     write_file(os.path.join(java_root, "MainActivity.java"), """package com.ffzy.tv;
 import android.app.Activity;
 import android.os.Bundle;
@@ -152,11 +170,17 @@ public class MainActivity extends Activity {{
 }}
 """)
 
-    # 图标
+    # Icons
     ic_launcher = create_icon("FF", 192, (70, 130, 180), (255, 255, 255))
     banner = create_icon("FFZYTV", 320, (41, 128, 185), (255, 255, 255))
-    ic_launcher.save(os.path.join(res, "mipmap-xxxhdpi", "ic_launcher.png"))
-    banner.save(os.path.join(res, "drawable", "banner.png"))
+    if ic_launcher:
+        ic_launcher.save(os.path.join(res, "mipmap-xxxhdpi", "ic_launcher.png"))
+    if banner:
+        banner.save(os.path.join(res, "drawable", "banner.png"))
+
+    # gradle-wrapper.jar
+    jar_data = download_and_extract_gradle_wrapper()
+    write_binary_file(os.path.join(root, "gradle", "wrapper", "gradle-wrapper.jar"), jar_data)
 
     # gradle-wrapper.properties
     write_file(os.path.join(root, "gradle", "wrapper", "gradle-wrapper.properties"), """distributionBase=GRADLE_USER_HOME
@@ -166,7 +190,7 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 """)
 
-    # ⚠️ 关键修复：gradlew 使用普通字符串（非 f-string）✅
+    # gradlew (Linux/macOS)
     GRADLEW_CONTENT = """#!/bin/bash
 PRG="$0"
 while [ -h "$PRG" ] ; do
@@ -183,50 +207,53 @@ cd "`dirname \\"$PRG\\"`/" >/dev/null
 APP_HOME="`pwd -P`"
 cd "$SAVED" >/dev/null
 
-APP_NAME="Gradle"
-APP_BASE_NAME=`basename "$0"`
-DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
-
-warn () {
-    ( echo "$*"; )
-}
-
-die () {
-    echo
-    echo "$*"
-    echo
-    exit 1
-}
-
-cygwin=false; msys=false; darwin=false; nonstop=false
-case "`uname`" in
-  CYGWIN* ) cygwin=true ;;
-  Darwin* ) darwin=true ;;
-  MINGW* ) msys=true ;;
-  NONSTOP* ) nonstop=true ;;
-esac
-
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
 if [ -n "$JAVA_HOME" ] ; then
   JAVACMD="$JAVA_HOME/bin/java"
-  [ ! -x "$JAVACMD" ] && die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
 else
   JAVACMD="java"
-  which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command found."
 fi
 
-exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS \\
+exec "$JAVACMD" -Xmx64m -Xms64m \\
   -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
 """
     write_file(os.path.join(root, "gradlew"), GRADLEW_CONTENT)
     os.chmod(os.path.join(root, "gradlew"), 0o755)
 
-    # 生成 keystore
+    # gradlew.bat (Windows)
+    GRADLEW_BAT = r"""@echo off
+set DIRNAME=%~dp0
+if "%DIRNAME%" == "" set DIRNAME=.
+set APP_HOME=%DIRNAME%
+
+set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
+
+@if "%JAVA_HOME%" == "" goto noJavaHome
+set JAVA_EXE=%JAVA_HOME%/bin/java.exe
+if exist "%JAVA_EXE%" goto execute
+echo ERROR: JAVA_HOME is set to an invalid directory: %JAVA_HOME%
+exit /b 1
+
+:noJavaHome
+set JAVA_EXE=java.exe
+%JAVA_EXE% -version >NUL 2>&1
+if %ERRORLEVEL% neq 0 (
+  echo ERROR: JAVA_HOME is not set and no 'java' command could be found.
+  exit /b 1
+)
+
+:execute
+"%JAVA_EXE%" -Xmx64m -Xms64m -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
+"""
+    write_file(os.path.join(root, "gradlew.bat"), GRADLEW_BAT)
+
+    # Try to generate keystore, but skip on failure
+    keystore_ok = False
     if not os.path.exists(keystore_path):
-        print("🔑 正在生成签名密钥...")
+        print("🔑 尝试生成签名密钥...")
         try:
-            subprocess.run([
+            result = subprocess.run([
                 "keytool", "-genkeypair",
                 "-v", "-storetype", "PKCS12",
                 "-keystore", keystore_path,
@@ -236,12 +263,21 @@ exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS \\
                 "-dname", "CN=FFZYTV, OU=TV, O=FFZY, C=CN",
                 "-storepass", "mypassword",
                 "-keypass", "mypassword"
-            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            ], capture_output=True, text=True, timeout=30)
+            if result.returncode == 0:
+                keystore_ok = True
+                print("✅ 签名密钥生成成功")
+            else:
+                print("⚠️ keytool 失败，将使用调试签名")
         except Exception as e:
-            print(f"⚠️ 密钥生成失败: {e}", file=sys.stderr)
+            print(f"⚠️ keytool 不可用: {e}，将使用调试签名")
 
-    print(f"\n✅ 项目 '{PROJECT_NAME}' 已成功生成！")
-    print(f"📁 进入目录并构建: cd {PROJECT_NAME} && ./gradlew assembleRelease")
+    print(f"\n✅ 项目 '{PROJECT_NAME}' 已生成！")
+    if keystore_ok:
+        print(f"📦 构建正式版: cd {PROJECT_NAME} && ./gradlew assembleRelease")
+    else:
+        print(f"🧪 构建调试版: cd {PROJECT_NAME} && ./gradlew assembleDebug")
+        print("   (正式签名密钥未生成，APK 将使用调试签名)")
 
 if __name__ == "__main__":
     main()
