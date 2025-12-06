@@ -61,7 +61,7 @@ plugins {
 }
 """)
 
-    # === App build.gradle (FIXED: removed invalid leanback-preference) ===
+    # === App build.gradle ===
     write_file(os.path.join(app_dir, "build.gradle"), f"""\
 plugins {{
     id 'com.android.application'
@@ -104,7 +104,7 @@ android {{
 
 dependencies {{
     implementation 'androidx.core:core-ktx:1.12.0'
-    // Optional: Uncomment below only if you use Leanback Fragments (e.g., BrowseSupportFragment)
+    // Optional: Uncomment below only if you use Leanback UI (e.g., BrowseSupportFragment)
     // implementation 'androidx.leanback:leanback:1.1.0-rc01'
 }}
 """)
@@ -155,11 +155,11 @@ public class MainActivity extends Activity {
 }
 """)
 
-    # === activity_main.xml ===
+    # === activity_main.xml (FIXED: match_match → match_parent) ===
     write_file(os.path.join(res, "layout", "activity_main.xml"), """\
 <?xml version="1.0" encoding="utf-8"?>
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_match"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:gravity="center"
     android:text="FFZYTV\\nhttps://cj.ffzyapi.com/"
@@ -186,7 +186,8 @@ zipStorePath=wrapper/dists
 """)
 
     print(f"✅ Android TV project '{PROJECT_NAME}' generated successfully!")
-    print("✅ Invalid leanback-preference dependency REMOVED")
+    print("✅ Fixed: 'match_match' → 'match_parent'")
+    print("✅ Removed invalid leanback-preference dependency")
     print("✅ Ready for './gradlew assembleRelease'")
     print("\n💡 Tip: To add Leanback UI later, uncomment the leanback line in app/build.gradle")
 
