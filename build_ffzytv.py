@@ -28,7 +28,7 @@ def main():
     for d in ["values", "layout", "drawable", "mipmap-xxxhdpi"]:
         os.makedirs(os.path.join(res, d), exist_ok=True)
 
-    # === gradle.properties (关键：启用 AndroidX) ===
+    # === gradle.properties ===
     write_file(os.path.join(root, "gradle.properties"), """\
 android.useAndroidX=true
 org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
@@ -61,7 +61,7 @@ plugins {
 }
 """)
 
-    # === App build.gradle ===
+    # === App build.gradle (FIXED: removed invalid leanback-preference) ===
     write_file(os.path.join(app_dir, "build.gradle"), f"""\
 plugins {{
     id 'com.android.application'
@@ -104,7 +104,8 @@ android {{
 
 dependencies {{
     implementation 'androidx.core:core-ktx:1.12.0'
-    implementation 'androidx.leanback:leanback-preference:1.1.0'
+    // Optional: Uncomment below only if you use Leanback Fragments (e.g., BrowseSupportFragment)
+    // implementation 'androidx.leanback:leanback:1.1.0-rc01'
 }}
 """)
 
@@ -158,7 +159,7 @@ public class MainActivity extends Activity {
     write_file(os.path.join(res, "layout", "activity_main.xml"), """\
 <?xml version="1.0" encoding="utf-8"?>
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
+    android:layout_width="match_match"
     android:layout_height="match_parent"
     android:gravity="center"
     android:text="FFZYTV\\nhttps://cj.ffzyapi.com/"
@@ -173,7 +174,7 @@ public class MainActivity extends Activity {
     ic_launcher.save(os.path.join(res, "mipmap-xxxhdpi", "ic_launcher.png"))
     banner.save(os.path.join(res, "drawable", "banner.png"))
 
-    # === Gradle Wrapper: Use Gradle 8.6 (required by AGP 8.3.0) ===
+    # === Gradle Wrapper ===
     gradle_wrapper_dir = os.path.join(root, "gradle", "wrapper")
     os.makedirs(gradle_wrapper_dir, exist_ok=True)
     write_file(os.path.join(gradle_wrapper_dir, "gradle-wrapper.properties"), """\
@@ -185,8 +186,9 @@ zipStorePath=wrapper/dists
 """)
 
     print(f"✅ Android TV project '{PROJECT_NAME}' generated successfully!")
-    print("✅ Includes gradle.properties with android.useAndroidX=true")
+    print("✅ Invalid leanback-preference dependency REMOVED")
     print("✅ Ready for './gradlew assembleRelease'")
+    print("\n💡 Tip: To add Leanback UI later, uncomment the leanback line in app/build.gradle")
 
 if __name__ == "__main__":
     main()
