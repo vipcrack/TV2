@@ -28,6 +28,12 @@ def main():
     for d in ["values", "layout", "drawable", "mipmap-xxxhdpi"]:
         os.makedirs(os.path.join(res, d), exist_ok=True)
 
+    # === gradle.properties (关键：启用 AndroidX) ===
+    write_file(os.path.join(root, "gradle.properties"), """\
+android.useAndroidX=true
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+""")
+
     # === settings.gradle ===
     write_file(os.path.join(root, "settings.gradle"), f"""\
 pluginManagement {{
@@ -178,7 +184,9 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 """)
 
-    print(f"✅ Android TV project '{PROJECT_NAME}' generated successfully with Gradle 8.6 + AGP 8.3.0!")
+    print(f"✅ Android TV project '{PROJECT_NAME}' generated successfully!")
+    print("✅ Includes gradle.properties with android.useAndroidX=true")
+    print("✅ Ready for './gradlew assembleRelease'")
 
 if __name__ == "__main__":
     main()
