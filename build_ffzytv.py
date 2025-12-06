@@ -6,6 +6,7 @@ FFZYTV - Full Android TV App Generator (Leanback + Picasso + ExoPlayer)
 - Works on Android TV & phones
 - Includes launcher icon & TV banner
 - Uses Picasso for robust image loading
+- FIXED: Presenter import issue & leanback version
 """
 
 import os
@@ -76,7 +77,7 @@ include ':app'
     write_file(os.path.join(root, "build.gradle"), 
                "plugins {\n    id 'com.android.application' version '8.3.0' apply false\n}\n")
 
-    # === app build.gradle (CORRECT LEANBACK VERSION) ===
+    # === app build.gradle ===
     write_file(os.path.join(app_dir, "build.gradle"), f"""plugins {{
     id 'com.android.application'
 }}
@@ -104,7 +105,7 @@ android {{
 
 dependencies {{
     implementation 'androidx.core:core-ktx:1.12.0'
-    implementation 'androidx.leanback:leanback:1.0.0'          // ✅ STABLE VERSION
+    implementation 'androidx.leanback:leanback:1.0.0'
     implementation 'androidx.leanback:leanback-preference:1.0.0'
 
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
@@ -226,7 +227,7 @@ public class ApiService {
 }
 """)
 
-    # === CardPresenter.java (with Picasso placeholder/error) ===
+    # === CardPresenter.java ===
     write_file(os.path.join(java_root, "CardPresenter.java"), """package com.ffzy.tv;
 
 import android.graphics.Color;
@@ -270,22 +271,24 @@ public class CardPresenter extends Presenter {
 }
 """)
 
-    # === MainActivity.java ===
+    # === MainActivity.java (FIXED: added correct imports) ===
     write_file(os.path.join(java_root, "MainActivity.java"), """package com.ffzy.tv;
 
+import android.content.Intent;
 import android.os.Bundle;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import androidx.leanback.app.BrowseSupportFragment;
 import androidx.leanback.widget.ArrayObjectAdapter;
 import androidx.leanback.widget.HeaderItem;
 import androidx.leanback.widget.ListRow;
 import androidx.leanback.widget.ListRowPresenter;
 import androidx.leanback.widget.OnItemViewClickedListener;
-import androidx.leanback.widget.Row;
-import androidx.leanback.widget.RowPresenter;
-import android.content.Intent;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import androidx.leanback.widget.Presenter;          // ✅ Fixed: added import
+import androidx.leanback.widget.Row;              // ✅
+import androidx.leanback.widget.RowPresenter;     // ✅
 
 public class MainActivity extends BrowseSupportFragment {
     private static final String[] CATEGORIES = {"电影", "连续剧", "综艺", "动漫"};
@@ -422,11 +425,9 @@ public class PlayerActivity extends AppCompatActivity {
 """)
 
     # === Generate minimal valid icons (1x1 colored PNGs) ===
-    # Red 1x1 → scaled to ic_launcher
     tiny_red = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
     write_binary_file(os.path.join(res, "mipmap-xxxhdpi", "ic_launcher.png"), tiny_red)
 
-    # Blue 1x1 → used as TV banner
     tiny_blue = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
     write_binary_file(os.path.join(res, "drawable", "banner.png"), tiny_blue)
 
@@ -457,6 +458,7 @@ if exist "%JAVA_HOME%\bin\java.exe" set JAVA_EXE=%JAVA_HOME%\bin\java.exe
 
     print(f"\n[SUCCESS] FFZYTV project generated!")
     print(f"✅ Leanback 1.0.0 (stable)")
+    print(f"✅ Fixed Presenter import error")
     print(f"✅ Picasso image loading with fallback")
     print(f"✅ ExoPlayer M3U8 support")
     print(f"✅ TV banner & launcher icon included")
