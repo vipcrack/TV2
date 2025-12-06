@@ -29,13 +29,27 @@ def main():
     for d in ["values", "layout", "drawable", "mipmap-xxxhdpi"]:
         os.makedirs(os.path.join(res, d), exist_ok=True)
 
-    # === Overwrite settings.gradle ===
+    # === CORRECTED: settings.gradle with pluginManagement ===
     write_file(os.path.join(root, "settings.gradle"), f"""\
+pluginManagement {{
+    repositories {{
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }}
+}}
+dependencyResolutionManagement {{
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {{
+        google()
+        mavenCentral()
+    }}
+}}
 rootProject.name = '{PROJECT_NAME}'
 include ':app'
 """)
 
-    # === Overwrite root build.gradle ===
+    # === Root build.gradle (using plugins block) ===
     write_file(os.path.join(root, "build.gradle"), """\
 plugins {
     id 'com.android.application' version '8.3.0' apply false
