@@ -8,29 +8,21 @@ FFZYTV Android 项目自动构建器（CI 友好版）
 
 import os
 import sys
-import tempfile
-import base64
 
 PROJECT_NAME = "FFZYTV"
 PACKAGE_NAME = "com.ffzy.tv"
 
 def get_local_gradle_wrapper_jar():
-    """从本地 assets/ 读取 gradle-wrapper.jar"""
     jar_path = os.path.join("assets", "gradle-wrapper.jar")
     if not os.path.isfile(jar_path):
-        print(f"[ERROR] 找不到 {jar_path}", file=sys.stderr)
-        print("[INFO] 解决方案:")
-        print("   1. 在本地运行以下命令生成 JAR:")
-        print("        gradle wrapper --gradle-version 8.6")
-        print("        mkdir -p assets && cp gradle/wrapper/gradle-wrapper.jar assets/")
-        print("   2. 提交到 Git:")
-        print("        git add assets/gradle-wrapper.jar")
-        print("        git commit -m 'Add gradle-wrapper.jar'")
-        print("        git push")
+        print(f"[ERROR] Missing file: {jar_path}", file=sys.stderr)
+        print("[INFO] Please run locally and commit:")
+        print("  gradle wrapper --gradle-version 8.6")
+        print("  mkdir -p assets && cp gradle/wrapper/gradle-wrapper.jar assets/")
         sys.exit(1)
     with open(jar_path, 'rb') as f:
         data = f.read()
-    print(f"[INFO] 使用本地 gradle-wrapper.jar ({len(data)} 字节)")
+    print(f"[INFO] Using local gradle-wrapper.jar ({len(data)} bytes)")
     return data
 
 def write_file(path, content):
@@ -45,21 +37,17 @@ def write_binary_file(path, data):
 
 def create_icon(text, size, bg, fg):
     try:
-        from PIL import Image, ImageDraw, ImageFont
+        from PIL import Image, ImageDraw
         img = Image.new("RGB", (size, size), bg)
         draw = ImageDraw.Draw(img)
-        try:
-            font = ImageFont.load_default()
-            draw.text((size // 2, size // 2), text, fill=fg, anchor="mm", font=font)
-        except:
-            draw.text((size // 2, size // 2), text, fill=fg, anchor="mm")
+        draw.text((size // 2, size // 2), text, fill=fg, anchor="mm")
         return img
     except ImportError:
-        print("[WARN] 未安装 Pillow，跳过图标生成（不影响构建）")
+        print("[WARN] Pillow not installed, skipping icons (build still works)")
         return None
 
 def main():
-    print("[BUILD] FFZYTV 构建器启动 (使用预提交的 gradle-wrapper.jar)")
+    print("[BUILD] Starting FFZYTV project generation...")
     
     root = PROJECT_NAME
     app_dir = os.path.join(root, "app")
@@ -67,12 +55,11 @@ def main():
     java_root = os.path.join(src, "java", *PACKAGE_NAME.split("."))
     res = os.path.join(src, "res")
 
-    print("[BUILD] 正在生成项目结构...")
     os.makedirs(java_root, exist_ok=True)
     for d in ["values", "layout", "drawable", "mipmap-xxxhdpi"]:
         os.makedirs(os.path.join(res, d), exist_ok=True)
 
-    # === 配置文件 ===
+    # Config files
     write_file(os.path.join(root, "gradle.properties"), 
                "android.useAndroidX=true\norg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8\n")
 
@@ -173,7 +160,7 @@ public class MainActivity extends Activity {
 }
 """)
 
-    # === 图标（可选）===
+    # Icons (optional)
     ic_launcher = create_icon("FF", 192, (70, 130, 180), (255, 255, 255))
     banner = create_icon("FFZYTV", 320, (41, 128, 185), (255, 255, 255))
     if ic_launcher:
@@ -181,12 +168,11 @@ public class MainActivity extends Activity {
     if banner:
         banner.save(os.path.join(res, "drawable", "banner.png"))
 
-    # === 关键：使用本地 gradle-wrapper.jar ===
-    print("[JAR] 写入 Gradle Wrapper JAR...")
+    # Write Gradle Wrapper JAR
+    print("[JAR] Writing gradle-wrapper.jar...")
     jar_data = get_local_gradle_wrapper_jar()
     write_binary_file(os.path.join(root, "gradle", "wrapper", "gradle-wrapper.jar"), jar_data)
 
-    # gradle-wrapper.properties
     write_file(os.path.join(root, "gradle", "wrapper", "gradle-wrapper.properties"), """distributionBase=GRADLE_USER_HOME
 distributionPath=wrapper/dists
 distributionUrl=https\\://services.gradle.org/distributions/gradle-8.6-bin.zip
@@ -194,7 +180,6 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 """)
 
-    # gradlew (Linux/macOS)
     write_file(os.path.join(root, "gradlew"), """#!/bin/bash
 APP_HOME="$(cd "$(dirname "$0")" && pwd)"
 CLASSPATH="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
@@ -202,7 +187,6 @@ exec java -Xmx64m -Xms64m -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapp
 """)
     os.chmod(os.path.join(root, "gradlew"), 0o755)
 
-    # gradlew.bat (Windows)
     write_file(os.path.join(root, "gradlew.bat"), r"""@echo off
 set DIRNAME=%~dp0
 if "%DIRNAME%" == "" set DIRNAME=.
@@ -213,18 +197,14 @@ if exist "%JAVA_HOME%\bin\java.exe" set JAVA_EXE=%JAVA_HOME%\bin\java.exe
 "%JAVA_EXE%" -Xmx64m -Xms64m -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
 """)
 
-    print(f"\n[SUCCESS] 项目 '{PROJECT_NAME}' 生成成功！")
-    print(f"\n[NEXT] 下一步：")
-    print(f"   cd {PROJECT_NAME}")
-    print(f"   ./gradlew assembleDebug")
-    print(f"\n[APK] APK 路径: app/build/outputs/apk/debug/app-debug.apk")
+    print(f"\n[SUCCESS] Project '{PROJECT_NAME}' generated!")
+    print(f"[NEXT] Run: cd {PROJECT_NAME} && ./gradlew assembleDebug")
+    print(f"[APK] Output: app/build/outputs/apk/debug/app-debug.apk")
 
 if __name__ == "__main__":
-    # 检查 Java（仅提示）
     try:
         import subprocess
         subprocess.run(["java", "-version"], capture_output=True, check=True)
     except:
-        print("[WARN] 警告: 未检测到 Java，构建时可能失败。请确保 CI 环境有 JDK 17+")
-    
+        print("[WARN] JDK 17+ is required for building APK")
     main()
