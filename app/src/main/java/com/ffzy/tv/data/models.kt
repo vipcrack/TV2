@@ -3,13 +3,10 @@ package com.ffzy.tv.data
 import com.google.gson.annotations.SerializedName
 
 data class ApiResponse(
-    val code: Int,
-    val msg: String,
-    val page: Int,
-    val pagecount: Int,
-    val limit: Int,
-    val total: Int,
-    val list: List<VodItem>
+    @SerializedName("list") val list: List<VodItem>,
+    @SerializedName("total") val total: Int,
+    @SerializedName("page") val page: Int,
+    @SerializedName("pagecount") val pageCount: Int
 )
 
 data class VodItem(
@@ -19,16 +16,6 @@ data class VodItem(
     @SerializedName("vod_area") val area: String,
     @SerializedName("vod_score") val score: String,
     @SerializedName("vod_time") val updateTime: String,
+    @SerializedName("vod_pic") val pic: String?,
     @SerializedName("vod_play_url") val playUrl: String? = null
-) {
-    fun getM3u8Url(): String? {
-        return playUrl?.split("\$")?.getOrNull(1)
-    }
-
-    fun getPlayableUrl(): String? {
-        val m3u8 = getM3u8Url()
-        return if (m3u8 != null) {
-            "https://svip.ffzyplay.com/?url=$m3u8"
-        } else null
-    }
-}
+)
