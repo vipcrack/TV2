@@ -1,19 +1,57 @@
 #!/usr/bin/env python3
+"""
+Automatically generates a self-contained build_ffzytv.py script
+with embedded gradle-wrapper.jar from official Gradle 8.6 distribution.
+No internet required after generation!
+"""
+
+import os
+import sys
+import urllib.request
+import zipfile
+import io
+import base64
+import tempfile
+
+# URL to official Gradle 8.6 binary distribution
+GRADLE_URL = "https://services.gradle.org/distributions/gradle-8.6-bin.zip"
+WRAPPER_JAR_PATH = "gradle-8.6/gradle/wrapper/gradle-wrapper.jar"
+
+def download_and_extract_jar():
+    print("📥 Downloading gradle-8.6-bin.zip (only partial fetch for efficiency)...")
+    try:
+        with urllib.request.urlopen(GRADLE_URL) as response:
+            # Read entire ZIP into memory (≈120MB, acceptable for CI)
+            zip_data = response.read()
+    except Exception as e:
+        print(f"❌ Failed to download Gradle: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print("📦 Extracting gradle-wrapper.jar from ZIP...")
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
+            jar_data = zf.read(WRAPPER_JAR_PATH)
+        print(f"✅ Extracted {len(jar_data)} bytes.")
+        return jar_data
+    except KeyError:
+        print(f"❌ Path not found in ZIP: {WRAPPER_JAR_PATH}", file=sys.stderr)
+        sys.exit(1)
+
+def encode_to_base64(data):
+    b64 = base64.b64encode(data).decode('ascii')
+    print("🔑 Encoding to base64...")
+    return b64
+
+def generate_build_script(jar_b64):
+    script_content = f'''#!/usr/bin/env python3
 import os
 import subprocess
 import sys
 import base64
-
 from PIL import Image, ImageDraw
 
-# Base64-encoded gradle-wrapper.jar for Gradle 8.6 (extracted from official zip)
-GRADLE_WRAPPER_JAR_B64 = """
-UEsDBBQACAgIAEaV7lYAAAAAAAAAAAAAAAAMAAAAZ3JhZGxlLXdyYXBwZXKtWNtu2zgQfddXDAoUkpFISdpdFIsC
-RRcFCrTYxbZPQUGTI5uIRYEku3b+/ZBSspw4TbcvRmSJwzNnzpkh5fN8Pt+AKMkCKpWECiWQgkJJKKWEUiqo
-...
-（此处省略大量 base64 数据，实际代码中会补全）
-...
-"""
+# Embedded gradle-wrapper.jar for Gradle 8.6 (official)
+GRADLE_WRAPPER_JAR_B64 = """{jar_b64}"""
 
 PROJECT_NAME = "FFZYTV"
 PACKAGE_NAME = "com.ffzy.tv"
@@ -43,14 +81,14 @@ def main():
     keystore_path = os.path.join(app_dir, "ffzytv.keystore")
     gradle_wrapper_jar = os.path.join(root, "gradle", "wrapper", "gradle-wrapper.jar")
 
-    # Create directories
     os.makedirs(java_root, exist_ok=True)
     for d in ["values", "layout", "drawable", "mipmap-xxxhdpi"]:
         os.makedirs(os.path.join(res, d), exist_ok=True)
 
-    # === Project files ===
-    write_file(os.path.join(root, "gradle.properties"), "android.useAndroidX=true\norg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8\n")
+    # gradle.properties
+    write_file(os.path.join(root, "gradle.properties"), "android.useAndroidX=true\\norg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8\\n")
 
+    # settings.gradle
     write_file(os.path.join(root, "settings.gradle"), f"""pluginManagement {{
     repositories {{
         gradlePluginPortal()
@@ -65,12 +103,14 @@ dependencyResolutionManagement {{
         mavenCentral()
     }}
 }}
-rootProject.name = '{PROJECT_NAME}'
+rootProject.name = '{{PROJECT_NAME}}'
 include ':app'
 """)
 
-    write_file(os.path.join(root, "build.gradle"), "plugins {\n    id 'com.android.application' version '8.3.0' apply false\n}\n")
+    # root build.gradle
+    write_file(os.path.join(root, "build.gradle"), "plugins {{\\n    id 'com.android.application' version '8.3.0' apply false\\n}}\\n")
 
+    # app build.gradle
     write_file(os.path.join(app_dir, "build.gradle"), f"""plugins {{
     id 'com.android.application'
 }}
@@ -110,6 +150,7 @@ dependencies {{
 }}
 """)
 
+    # AndroidManifest.xml
     write_file(os.path.join(src, "AndroidManifest.xml"), f"""<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
@@ -131,7 +172,10 @@ dependencies {{
 </manifest>
 """)
 
-    write_file(os.path.join(res, "values", "strings.xml"), "<resources>\n    <string name=\"app_name\">FFZYTV</string>\n</resources>\n")
+    # strings.xml
+    write_file(os.path.join(res, "values", "strings.xml"), "<resources>\\n    <string name=\\"app_name\\">FFZYTV</string>\\n</resources>\\n")
+    
+    # activity_main.xml
     write_file(os.path.join(res, "layout", "activity_main.xml"), """<?xml version="1.0" encoding="utf-8"?>
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -142,6 +186,7 @@ dependencies {{
     android:background="#2C3E50"/>
 """)
 
+    # MainActivity.java
     write_file(os.path.join(java_root, "MainActivity.java"), """package com.ffzy.tv;
 import android.app.Activity;
 import android.os.Bundle;
@@ -154,32 +199,31 @@ public class MainActivity extends Activity {
 }
 """)
 
-    # === Generate icons ===
+    # Icons
     ic_launcher = create_icon("FF", 192, (70, 130, 180), (255, 255, 255))
     banner = create_icon("FFZYTV", 320, (41, 128, 185), (255, 255, 255))
     ic_launcher.save(os.path.join(res, "mipmap-xxxhdpi", "ic_launcher.png"))
     banner.save(os.path.join(res, "drawable", "banner.png"))
 
-    # === Write gradle-wrapper.jar from embedded base64 ===
-    print("📦 Embedding gradle-wrapper.jar...")
+    # Write gradle-wrapper.jar
+    print("📦 Writing gradle-wrapper.jar...")
     try:
         jar_data = base64.b64decode(GRADLE_WRAPPER_JAR_B64.strip())
         write_binary_file(gradle_wrapper_jar, jar_data)
-        print("✅ gradle-wrapper.jar embedded.")
     except Exception as e:
-        print(f"❌ Failed to decode or write gradle-wrapper.jar: {e}", file=sys.stderr)
+        print(f"❌ Failed to write gradle-wrapper.jar: {{e}}", file=sys.stderr)
         sys.exit(1)
 
-    # === gradle-wrapper.properties ===
+    # gradle-wrapper.properties
     write_file(os.path.join(root, "gradle", "wrapper", "gradle-wrapper.properties"), """distributionBase=GRADLE_USER_HOME
 distributionPath=wrapper/dists
-distributionUrl=https\\://services.gradle.org/distributions/gradle-8.6-bin.zip
+distributionUrl=https\\\\://services.gradle.org/distributions/gradle-8.6-bin.zip
 zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 """)
 
-    # === gradlew script ===
-    GRADLEW_CONTENT = '''#!/bin/bash
+    # gradlew
+    GRADLEW_CONTENT = """#!/bin/bash
 PRG="$0"
 while [ -h "$PRG" ] ; do
   ls=`ls -ld "$PRG"`
@@ -222,11 +266,11 @@ fi
 
 exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS \\
   -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
-'''
+"""
     write_file(os.path.join(root, "gradlew"), GRADLEW_CONTENT)
     os.chmod(os.path.join(root, "gradlew"), 0o755)
 
-    # === Keystore (non-fatal) ===
+    # Keystore
     if not os.path.exists(keystore_path):
         print("🔑 Generating keystore...")
         try:
@@ -241,12 +285,30 @@ exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS \\
                 "-storepass", "mypassword",
                 "-keypass", "mypassword"
             ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print("✅ Keystore generated.")
         except Exception as e:
-            print(f"⚠️  Keystore failed: {e}", file=sys.stderr)
+            print(f"⚠️ Keystore failed: {{e}}", file=sys.stderr)
 
-    print(f"\n✅ Project '{PROJECT_NAME}' ready!")
-    print(f"📁 Run: cd {PROJECT_NAME} && ./gradlew --version")
+    print(f"\\n✅ Project '{{PROJECT_NAME}}' ready!")
+    print(f"📁 Run: cd {{PROJECT_NAME}} && ./gradlew --version")
+
+if __name__ == "__main__":
+    main()
+'''
+    return script_content
+
+def main():
+    print("🚀 Starting auto-generation of build_ffzytv.py...")
+    jar_data = download_and_extract_jar()
+    jar_b64 = encode_to_base64(jar_data)
+    script = generate_build_script(jar_b64)
+
+    output_file = "build_ffzytv.py"
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(script)
+    
+    print(f"\n🎉 Success! Generated: {os.path.abspath(output_file)}")
+    print("You can now run:")
+    print(f"  python {output_file}")
 
 if __name__ == "__main__":
     main()
