@@ -13,7 +13,6 @@ def write_file(path, content):
 def create_icon(text, size, bg, fg):
     img = Image.new("RGB", (size, size), bg)
     draw = ImageDraw.Draw(img)
-    # Use default font (Pillow built-in)
     draw.text((size // 2, size // 2), text, fill=fg, anchor="mm")
     return img
 
@@ -24,12 +23,12 @@ def main():
     java_root = os.path.join(src, "java", *PACKAGE_NAME.split("."))
     res = os.path.join(src, "res")
 
-    # Create all necessary directories
+    # Create directories
     os.makedirs(java_root, exist_ok=True)
     for d in ["values", "layout", "drawable", "mipmap-xxxhdpi"]:
         os.makedirs(os.path.join(res, d), exist_ok=True)
 
-    # === CORRECTED: settings.gradle with pluginManagement ===
+    # === settings.gradle ===
     write_file(os.path.join(root, "settings.gradle"), f"""\
 pluginManagement {{
     repositories {{
@@ -49,14 +48,14 @@ rootProject.name = '{PROJECT_NAME}'
 include ':app'
 """)
 
-    # === Root build.gradle (using plugins block) ===
+    # === Root build.gradle ===
     write_file(os.path.join(root, "build.gradle"), """\
 plugins {
     id 'com.android.application' version '8.3.0' apply false
 }
 """)
 
-    # === App-level build.gradle ===
+    # === App build.gradle ===
     write_file(os.path.join(app_dir, "build.gradle"), f"""\
 plugins {{
     id 'com.android.application'
@@ -99,6 +98,7 @@ android {{
 
 dependencies {{
     implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.leanback:leanback-preference:1.1.0'
 }}
 """)
 
@@ -161,13 +161,24 @@ public class MainActivity extends Activity {
 """)
 
     # === Generate icons ===
-    ic_launcher = create_icon("FF", 192, (70, 130, 180), (255, 255, 255))  # xxxhdpi = 192x192
+    ic_launcher = create_icon("FF", 192, (70, 130, 180), (255, 255, 255))
     banner = create_icon("FFZYTV", 320, (41, 128, 185), (255, 255, 255))
 
     ic_launcher.save(os.path.join(res, "mipmap-xxxhdpi", "ic_launcher.png"))
     banner.save(os.path.join(res, "drawable", "banner.png"))
 
-    print(f"✅ Android TV project '{PROJECT_NAME}' generated successfully!")
+    # === Gradle Wrapper: Use Gradle 8.6 (required by AGP 8.3.0) ===
+    gradle_wrapper_dir = os.path.join(root, "gradle", "wrapper")
+    os.makedirs(gradle_wrapper_dir, exist_ok=True)
+    write_file(os.path.join(gradle_wrapper_dir, "gradle-wrapper.properties"), """\
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.6-bin.zip
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+""")
+
+    print(f"✅ Android TV project '{PROJECT_NAME}' generated successfully with Gradle 8.6 + AGP 8.3.0!")
 
 if __name__ == "__main__":
     main()
