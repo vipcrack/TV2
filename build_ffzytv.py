@@ -1,54 +1,32 @@
 #!/usr/bin/env python3
 """
-FFZYTV Android 项目自动构建器
-- 自动下载 gradle-8.6-bin.zip
-- 提取内嵌的 gradle-wrapper.jar
-- 生成可直接构建的 Android 项目
+FFZYTV Android 项目自动构建器（CI 友好版）
+- 使用本地 assets/gradle-wrapper.jar 避免网络依赖
+- 生成完整 Android 项目
 - 支持 ./gradlew assembleDebug
 """
 
 import os
 import sys
-import urllib.request
-import zipfile
 import tempfile
 import base64
 
 PROJECT_NAME = "FFZYTV"
 PACKAGE_NAME = "com.ffzy.tv"
 
-def download_and_extract_gradle_wrapper_jar():
-    """从官方 gradle-8.6-bin.zip 中提取 gradle-wrapper.jar"""
-    url = "https://services.gradle.org/distributions/gradle-8.6-bin.zip"
-    print("📥 正在从官方源下载 gradle-8.6-bin.zip（约 120MB）...")
-    
-    try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            zip_path = os.path.join(tmpdir, "gradle-8.6-bin.zip")
-            
-            # 下载 ZIP
-            def reporthook(blocknum, blocksize, totalsize):
-                if totalsize > 0:
-                    percent = min(100, (blocknum * blocksize * 100) // totalsize)
-                    sys.stdout.write(f"\r⏳ 下载中... {percent}%")
-                    sys.stdout.flush()
-            urllib.request.urlretrieve(url, zip_path, reporthook)
-            print("\n✅ 下载完成！")
-
-            # 解压并查找 gradle-wrapper.jar
-            print("🔍 正在提取 gradle-wrapper.jar...")
-            with zipfile.ZipFile(zip_path, 'r') as zf:
-                for member in zf.namelist():
-                    if member.endswith("lib/plugins/gradle-wrapper-8.6.jar"):
-                        jar_data = zf.read(member)
-                        print("✅ 提取成功！")
-                        return jar_data
-                
-                raise FileNotFoundError("❌ 未在 ZIP 中找到 gradle-wrapper.jar")
-                
-    except Exception as e:
-        print(f"\n💥 错误: {e}", file=sys.stderr)
+def get_local_gradle_wrapper_jar():
+    """从本地 assets/ 读取 gradle-wrapper.jar"""
+    jar_path = os.path.join("assets", "gradle-wrapper.jar")
+    if not os.path.isfile(jar_path):
+        print(f"❌ 错误: 找不到 {jar_path}", file=sys.stderr)
+        print("💡 请先运行以下命令生成它：")
+        print("   gradle wrapper --gradle-version 8.6")
+        print("   mkdir -p assets && cp gradle/wrapper/gradle-wrapper.jar assets/")
         sys.exit(1)
+    with open(jar_path, 'rb') as f:
+        data = f.read()
+    print(f"📦 使用本地 gradle-wrapper.jar ({len(data)} 字节)")
+    return data
 
 def write_file(path, content):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -66,7 +44,6 @@ def create_icon(text, size, bg, fg):
         img = Image.new("RGB", (size, size), bg)
         draw = ImageDraw.Draw(img)
         try:
-            # 尝试使用默认字体
             font = ImageFont.load_default()
             draw.text((size // 2, size // 2), text, fill=fg, anchor="mm", font=font)
         except:
@@ -197,9 +174,9 @@ public class MainActivity extends Activity {
     if banner:
         banner.save(os.path.join(res, "drawable", "banner.png"))
 
-    # === 关键：获取并写入 gradle-wrapper.jar ===
-    print("🔑 正在处理 Gradle Wrapper...")
-    jar_data = download_and_extract_gradle_wrapper_jar()
+    # === 关键：使用本地 gradle-wrapper.jar ===
+    print("🔑 写入 Gradle Wrapper JAR...")
+    jar_data = get_local_gradle_wrapper_jar()
     write_binary_file(os.path.join(root, "gradle", "wrapper", "gradle-wrapper.jar"), jar_data)
 
     # gradle-wrapper.properties
@@ -234,11 +211,11 @@ set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
     print(f"\n📱 APK 路径: app/build/outputs/apk/debug/app-debug.apk")
 
 if __name__ == "__main__":
-    # 检查 Java
+    # 检查 Java（仅提示）
     try:
         import subprocess
         subprocess.run(["java", "-version"], capture_output=True, check=True)
     except:
-        print("⚠️  警告: 未检测到 Java，构建时可能失败。请安装 JDK 17+")
+        print("⚠️  警告: 未检测到 Java，构建时可能失败。请确保 CI 环境有 JDK 17+")
     
     main()
