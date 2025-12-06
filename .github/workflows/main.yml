@@ -1,0 +1,73 @@
+name: Build FFZYTV APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Pillow
+        run: pip install pillow
+
+      - name: Generate Project
+        run: python build_ffzytv.py
+
+      - name: Restore Keystore from Secret
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > FFZYTV/app/ffzytv.keystore
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build APK
+        working-directory: FFZYTV
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Find APK
+        id: find_apk
+        run: |
+          apk=$(find app/build/outputs/apk/release -name "*.apk" | head -n1)
+          if [[ -z "$apk" ]]; then echo "APK not found!"; exit 1; fi
+          echo "apk_path=$apk" >> $GITHUB_OUTPUT
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffzytv-apk
+          path: ${{ steps.find_apk.outputs.apk_path }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          files: ${{ steps.find_apk.outputs.apk_path }}
+          tag_name: v1.${{ github.run_number }}
+          name: FFZYTV v1.${{ github.run_number }}
+          body: |
+            Auto-built from commit ${{ github.sha }}
+            API: https://cj.ffzyapi.com/
+            Includes TV banner and app icon.
