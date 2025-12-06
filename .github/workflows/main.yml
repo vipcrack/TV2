@@ -1,15 +1,14 @@
 name: Build FFZYTV APK
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+on: [push, pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -17,19 +16,32 @@ jobs:
           python-version: '3.10'
 
       - name: Install Pillow
-        run: pip install pillow
-
-      - name: Generate Android project
-        run: python build_ffzytv.py
-
-      - name: Restore keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > FFZYTV/app/ffzytv.keystore
+        run: pip install Pillow
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+
+      - name: Create project directory
+        run: mkdir -p FFZYTV
+
+      - name: Generate Gradle Wrapper (official way)
+        working-directory: FFZYTV
+        run: |
+          gradle wrapper --gradle-version 8.3
+          chmod +x gradlew
+
+      - name: Generate Android project source
+        run: python build_ffzytv.py
+
+      # Optional: Restore keystore if needed (example using secret)
+      - name: Restore keystore (optional)
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_B64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > FFZYTV/app/ffzytv.keystore
+          fi
 
       - name: Build Release APK
         working-directory: FFZYTV
@@ -42,5 +54,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ffzytv-apk
+          name: app-release
           path: FFZYTV/app/build/outputs/apk/release/app-release.apk
