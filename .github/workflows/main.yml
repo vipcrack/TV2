@@ -35,32 +35,23 @@ jobs:
         run: |
           echo "Checking keytool..."
           which keytool
-          keytool -help > /dev/null && echo "✅ keytool found"
+          keytool -help >/dev/null && echo "✅ keytool found"
 
       - name: 🏗️ Generate Android TV project
         run: python build_ffzytv.py
 
-      - name: 🔎 Debug: List generated project structure
+      - name: 🔎 Debug: Check if gradlew exists
         run: |
-          echo "=== Project root ==="
-          ls -la FFZYTV/
-          echo ""
-          echo "=== gradle/wrapper ==="
-          ls -la FFZYTV/gradle/wrapper/
-          echo ""
-          echo "=== app directory ==="
-          ls -la FFZYTV/app/
-          echo ""
-          echo "=== Check gradlew ==="
-          if [ -f FFZYTV/gradlew ]; then
-            echo "✅ gradlew exists"
-            file FFZYTV/gradlew
-          else
-            echo "❌ ERROR: gradlew NOT FOUND!"
+          if [ ! -f FFZYTV/gradlew ]; then
+            echo "❌ ERROR: FFZYTV/gradlew not found!"
+            echo "Contents of FFZYTV/:"
+            ls -la FFZYTV/
             exit 1
           fi
+          echo "✅ gradlew exists"
+          ls -l FFZYTV/gradlew
 
-      - name: 🔐 Ensure gradlew is executable (safety fallback)
+      - name: 🔐 Make gradlew executable (just in case)
         run: chmod +x FFZYTV/gradlew
 
       - name: 🧱 Build Release APK
@@ -68,11 +59,11 @@ jobs:
           cd FFZYTV
           ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: 📂 Debug: Show APK output directory
+      - name: 📂 Show APK output
         run: |
           ls -la FFZYTV/app/build/outputs/apk/release/
 
-      - name: 📤 Upload Release APK as Artifact
+      - name: 📤 Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: FFZYTV-release-apk
