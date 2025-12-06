@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-FFZYTV - Full Android TV App Generator (with Leanback, Network, Player, Icons, Picasso)
-- Fetches video list from https://cj.ffzyapi.com/
-- Plays via ExoPlayer (M3U8)
+FFZYTV - Full Android TV App Generator (Leanback + Picasso + ExoPlayer)
+- Fetches from https://cj.ffzyapi.com/
+- Plays M3U8 via ExoPlayer
+- Works on Android TV & phones
 - Includes launcher icon & TV banner
-- Uses Picasso for image loading
-- Installs with desktop icon on phone/TV
+- Uses Picasso for robust image loading
 """
 
 import os
@@ -15,14 +15,11 @@ import base64
 PROJECT_NAME = "FFZYTV"
 PACKAGE_NAME = "com.ffzy.tv"
 
-# Base64-encoded minimal placeholder images (1x1 transparent PNG expanded to required size by Android)
-PLACEHOLDER_ICON_B64 = "iVBORw0KGgoAAAANSUhEUgAAAGAAAAA... truncated for brevity"  # We'll generate real fallbacks below
-
 def get_local_gradle_wrapper_jar():
     jar_path = os.path.join("assets", "gradle-wrapper.jar")
     if not os.path.isfile(jar_path):
         print(f"[ERROR] Missing: {jar_path}", file=sys.stderr)
-        print("[INFO] Run locally and commit:")
+        print("[INFO] Please run locally and commit:")
         print("  ./gradlew wrapper --gradle-version 8.6")
         print("  mkdir -p assets && cp gradle/wrapper/gradle-wrapper.jar assets/")
         sys.exit(1)
@@ -39,59 +36,8 @@ def write_binary_file(path, data):
     with open(path, 'wb') as f:
         f.write(data)
 
-def create_placeholder_png(width, height, text="FF"):
-    """Generate a simple colored PNG with text using only base64 (no PIL)"""
-    # Use a very small embedded SVG as fallback (Android supports vector drawables, but we use PNG for simplicity)
-    # Instead, we provide a real 192x192 red square with white text as base64 (pre-generated)
-    if width == 192 and height == 192:
-        # FF icon (192x192)
-        return base64.b64decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAACXBIWXMAAAsTAAALEwEAmpwYAAAF5mlUWHRYTUw6Y29tLmFkb2JlLnhtcAAA"
-            "oATUAAAAAElFTkSuQmCC"  # This is too short; let's use a real one
-        )
-    elif width == 320 and height == 180:
-        # Banner (320x180)
-        return base64.b64decode(
-            "iVBORw0KGgoAAAANSUhEUgAUAAAABACAIAAAD2BZyAAAACXBIWXMAAAsTAAALEwEAmpwYAAAKTWlUWHRYTUw6Y29tLmFkb2JlLnhtcAAA"
-            "oARIAAAAI0lEQVR4nO3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA......"
-        )
-    else:
-        # Fallback 1x1 transparent
-        return base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==")
-
 def main():
-    print("[BUILD] Generating FFZYTV Android TV app with Picasso support...")
+    print("[BUILD] Generating FFZYTV Android TV app...")
 
     root = PROJECT_NAME
     app_dir = os.path.join(root, "app")
@@ -130,7 +76,7 @@ include ':app'
     write_file(os.path.join(root, "build.gradle"), 
                "plugins {\n    id 'com.android.application' version '8.3.0' apply false\n}\n")
 
-    # === app build.gradle (WITH PICASSO) ===
+    # === app build.gradle (CORRECT LEANBACK VERSION) ===
     write_file(os.path.join(app_dir, "build.gradle"), f"""plugins {{
     id 'com.android.application'
 }}
@@ -158,8 +104,8 @@ android {{
 
 dependencies {{
     implementation 'androidx.core:core-ktx:1.12.0'
-    implementation 'androidx.leanback:leanback:1.1.0'
-    implementation 'androidx.leanback:leanback-preference:1.1.0'
+    implementation 'androidx.leanback:leanback:1.0.0'          // ✅ STABLE VERSION
+    implementation 'androidx.leanback:leanback-preference:1.0.0'
 
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'org.jsoup:jsoup:1.17.2'
@@ -280,7 +226,7 @@ public class ApiService {
 }
 """)
 
-    # === CardPresenter.java (WITH PICASSO + PLACEHOLDER) ===
+    # === CardPresenter.java (with Picasso placeholder/error) ===
     write_file(os.path.join(java_root, "CardPresenter.java"), """package com.ffzy.tv;
 
 import android.graphics.Color;
@@ -309,9 +255,7 @@ public class CardPresenter extends Presenter {
         cardView.setTitleText(video.title);
         cardView.setContentText("");
 
-        // Placeholder: light gray
         ColorDrawable placeholder = new ColorDrawable(Color.parseColor("#EEEEEE"));
-        // Error drawable: dark gray
         ColorDrawable errorDrawable = new ColorDrawable(Color.parseColor("#CCCCCC"));
 
         Picasso.get()
@@ -477,21 +421,12 @@ public class PlayerActivity extends AppCompatActivity {
 }
 """)
 
-    # === Generate icons as base64 fallbacks ===
-    # ic_launcher.png (192x192)
-    launcher_b64 = "iVBORw0KGgoAAAANSUhEUgAAAGAAAAA... truncated"
-    # We'll use real minimal PNGs
-    # Actual 192x192 red square with white "FF"
-    launcher_png = base64.b64decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAGAAAAA... (real data would be long)"
-    )
-    # Instead, generate a simple solid color image via code is complex without PIL.
-    # So we provide a tiny valid PNG that Android will scale.
-    # Use a 1x1 red pixel → Android scales it up (ugly but works)
+    # === Generate minimal valid icons (1x1 colored PNGs) ===
+    # Red 1x1 → scaled to ic_launcher
     tiny_red = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
     write_binary_file(os.path.join(res, "mipmap-xxxhdpi", "ic_launcher.png"), tiny_red)
 
-    # banner.png (320x180) - use 1x1 blue
+    # Blue 1x1 → used as TV banner
     tiny_blue = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
     write_binary_file(os.path.join(res, "drawable", "banner.png"), tiny_blue)
 
@@ -520,14 +455,15 @@ if exist "%JAVA_HOME%\bin\java.exe" set JAVA_EXE=%JAVA_HOME%\bin\java.exe
 "%JAVA_EXE%" -Xmx64m -Xms64m -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
 """)
 
-    print(f"\n[SUCCESS] FFZYTV app generated with:")
-    print(f"  - Leanback UI")
-    print(f"  - Network (OkHttp + Jsoup)")
-    print(f"  - Image loading (Picasso with placeholder/error)")
-    print(f"  - ExoPlayer M3U8 playback")
-    print(f"  - Desktop icon & TV banner")
-    print(f"[NEXT] Run: cd {PROJECT_NAME} && ./gradlew assembleDebug")
-    print(f"[APK] Find at: app/build/outputs/apk/debug/app-debug.apk")
+    print(f"\n[SUCCESS] FFZYTV project generated!")
+    print(f"✅ Leanback 1.0.0 (stable)")
+    print(f"✅ Picasso image loading with fallback")
+    print(f"✅ ExoPlayer M3U8 support")
+    print(f"✅ TV banner & launcher icon included")
+    print(f"\n[Next steps]")
+    print(f"  cd {PROJECT_NAME}")
+    print(f"  ./gradlew assembleDebug")
+    print(f"  # APK: app/build/outputs/apk/debug/app-debug.apk")
 
 if __name__ == "__main__":
     main()
